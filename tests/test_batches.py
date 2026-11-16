@@ -18,6 +18,12 @@ def test_sample_export_has_all_bad_rows(sample):
 
 def test_source_hash_sensitive():assert digest(b'a',{})!=digest(b'b',{})
 
+def test_rule_version_changes_run_id(monkeypatch):
+    from app import config
+    before=digest(b'a',{})
+    monkeypatch.setattr(config,'VERSION','2099.01.1')
+    assert digest(b'a',{})!=before
+
 def test_unknown_parameter_rejected():
     with pytest.raises(DomainError):validate({'rate':99},{})
 

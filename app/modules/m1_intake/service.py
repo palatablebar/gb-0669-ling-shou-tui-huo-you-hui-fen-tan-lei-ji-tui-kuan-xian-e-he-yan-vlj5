@@ -1,5 +1,5 @@
 import base64
-from app.config import ROOT
+from app.config import ROOT, SAMPLES
 from app.errors import DomainError
 from .rules import parse
 
@@ -11,7 +11,7 @@ def source(payload):
     if 'base64' in payload:
         try:return base64.b64decode(payload['base64'],validate=True)
         except (ValueError,TypeError):raise DomainError('BASE64','文件内容无效')
-    if sample not in ('dirty','clean'):raise DomainError('SAMPLE','样例名称无效')
+    if sample not in SAMPLES:raise DomainError('SAMPLE','样例名称无效')
     return (ROOT/'sample_data'/f'{sample}.csv').read_bytes()
 
 def execute(payload):

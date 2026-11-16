@@ -1,8 +1,11 @@
 import csv
 import io
-from app.config import COLUMNS, MAX_ROWS, MAX_BYTES
+from app.config import COLUMNS, OPTIONAL_COLUMNS, MAX_ROWS, MAX_BYTES
 from app.errors import DomainError
 from app.reasons import issue
+
+VALID_HEADERS = frozenset(COLUMNS + OPTIONAL_COLUMNS)
+REQUIRED_HEADERS = frozenset(COLUMNS)
 
 def decode(raw):
     if len(raw)>MAX_BYTES: raise DomainError('TOO_LARGE','文件超过2MB',413)
@@ -21,15 +24,16 @@ def parse(raw):
         if header is None: header=[]
         if not header or all(not c.strip() for c in header):
             if not text.strip():return {'rows':[],'quarantine':[],'input':0,'blank':len(text.splitlines()),'headers':0,'encoding':encoding,'state':'BLANK_ONLY'}
-        header=[c.strip().lstrip('\ufeff') for c in header]
-        if len(set(header))!=len(header) or set(header)!=set(COLUMNS): raise DomainError('HEADER','字段不匹配')
+        header=[c.strip().lstrip('﻿') for c in header]
+        if len(set(header))!=len(header) or not REQUIRED_HEADERS.issubset(header) or not set(header).issubset(VALID_HEADERS): raise DomainError('HEADER','字段不匹配')
+        width=len(header)
         for values in reader:
             if not values or all(not v.strip() for v in values): blank+=1;continue
             if values==header: headers+=1;continue
             count+=1
             if count>MAX_ROWS:raise DomainError('TOO_MANY_ROWS','记录超过10000行',413)
             row={'line':reader.line_num,'raw':dict(zip(header,values))}
-            if len(values)!=len(header):bad.append(issue(row,'COLUMN_COUNT','字段数量不一致'));continue
+            if len(values)!=width:bad.append(issue(row,'COLUMN_COUNT','字段数量不一致'));continue
             rows.append(row)
     except csv.Error as exc: raise DomainError('CSV_BROKEN',f'CSV结构错误：{exc}')
     return {'rows':rows,'quarantine':bad,'input':count,'blank':blank,'headers':headers,'encoding':encoding,'state':'READY' if count else 'HEADER_ONLY'}

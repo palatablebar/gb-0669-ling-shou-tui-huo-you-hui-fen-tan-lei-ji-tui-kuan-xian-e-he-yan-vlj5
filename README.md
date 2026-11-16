@@ -23,11 +23,21 @@ docker compose up --build -d
 - 促销契约：`/contract`，`GET/POST /api/contract`。
 - 优惠分摊：`/model`，`GET/POST /api/model`。
 - 退款核算：`/calculate`，`GET/POST /api/calculate`。
+- 渠道退货：`/channels`，`GET /api/channels/queue`，`POST /api/channels/submit|import|recover`。
 - 争议隔离：`/quarantine`，`GET/POST /api/quarantine`。
 - 支付对账：`/reconcile`，`GET/POST /api/reconcile`。
 - 批次复核：`/batches`，`GET/POST /api/batches`。
 
 [接口文档](http://localhost:18208/docs)。
+
+## 门店与线上并发：谁取得尾件资格
+
+**实际退货更早的渠道取得退货与运费资格，同步先到不取得。** 系统只按UTC实际退货时间排序、同刻按事件号决胜；同步到达顺序仅在核算页以“同步先到/后到”标注，不参与资格判定。落败渠道收到 `ELIGIBILITY_LOST`，原因中写明资格取得方，且不冲减累计。
+
+- 退款核算页逐次退货展示：占用商品（SKU+件序）、退前累计可退、本次可退（含运费）、退后累计可退、运费资格归属与渠道标签。
+- 渠道退货页的持久台账以事件号为主键：同报文重试幂等回放、不重复冲减；同事件号异值/跨渠道冲突返回409。
+- 规则升级后旧批次标记失效并禁止复核，`/api/channels/recover` 保留全部已确认退货后按新规则重算；所有写入在单个SQLite事务内完成，失败不丢已确认退货。
+- 选用 `contest` 样例可演示：同步序与业务序相反、同刻决胜、重试幂等、整单退货运费归属、落败渠道拒因。
 
 ## 验证
 
@@ -38,7 +48,7 @@ docker compose exec -T app pytest -q
 
 ## 数据与定义
 
-仅处理CNY；所有金额先用Decimal检查精度，再以整数分计算，不进行浮点累加。销售行须有正数量和单价，同订单的整单优惠与运费重复填写但只计算一次。同单SKU唯一，件数上限10000。整单优惠按每件单价最大余额分摊，余数相同时按SKU及件序确定。退货按原件序回收原实付，已退单位不重复使用；全部件数退完才返运费一次。退货按UTC与事件号排序，早于销售或超过数量的退货隔离且不改变已退款累计。
+仅处理CNY；所有金额先用Decimal检查精度，再以整数分计算，不进行浮点累加。销售行须有正数量和单价，同订单的整单优惠与运费重复填写但只计算一次。同单SKU唯一，件数上限10000。整单优惠按每件单价最大余额分摊，余数相同时按SKU及件序确定。退货按原件序回收原实付，已退单位不重复使用；全部件数退完才返运费一次。退货按UTC与事件号排序（与同步到达顺序无关），早于销售或超过数量的退货隔离且不改变已退款累计；尾件资格由实际退货时间更早的渠道取得，落败渠道可见 ELIGIBILITY_LOST 拒因。渠道事件以事件号为幂等键落入持久台账，规则更新后旧结果失效并可保留确认退货重算。
 
 定义见 `docs/DATA-DICTIONARY.md`，模块和测试映射见 `docs/DEPTH.md`。样例位于 `sample_data/`。SQLite存放于命名卷，重启保留批次。确认不再需要历史记录时，可用 `docker compose down -v` 重建数据。
 

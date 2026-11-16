@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% block content %}<div class="grid">
+<section class="panel full">
+  <div class="panel__head"><h2>渠道退货提交（门店 / 线上并发）</h2><span class="panel__meta">资格按实际退货时间判定，同事件号重试幂等</span></div>
+  <div class="panel__body">
+    <form id="channel-form" class="input-grid">
+      <div class="form-row">
+        <label class="field">渠道<select name="channel"><option value="store">门店 store</option><option value="online">线上 online</option></select></label>
+        <label class="field">退货单号<input name="event_id" placeholder="R501" required></label>
+        <label class="field">订单号<input name="order_id" placeholder="C100" required></label>
+        <label class="field">SKU<input name="sku" placeholder="B-03" required></label>
+        <label class="field">件数<input name="quantity" type="number" min="1" value="1" required></label>
+        <label class="field">退货时间（带偏移）<input name="time" placeholder="2026-11-08T10:00:00+08:00" required></label>
+      </div>
+      <div class="form-row">
+        <label class="field">单价 / 元<input name="unit_price" value="0" required></label>
+        <label class="field">优惠 / 元<input name="discount" value="0" required></label>
+        <label class="field">运费 / 元<input name="shipping" value="0" required></label>
+        <label class="field">币种<input name="currency" value="CNY" required></label>
+        <button class="primary" type="submit">提交并重算</button>
+        <button type="button" id="channel-recover">规则更新后恢复重算</button>
+      </div>
+    </form>
+    <div class="error" id="channel-error" hidden role="alert"></div>
+    <div class="panel__meta" id="channel-result"></div>
+  </div>
+</section>
+<section class="panel full">
+  <div class="panel__head"><h2>持久台账：确认退货不丢失</h2><span class="panel__meta">规则版本 {{ section.rule_version }} · {{ section.ledger|length }} 笔</span></div>
+  <div class="panel__body panel__body--scroll">
+    <table class="ledger">
+      <thead><tr><th>#</th><th>退货单号</th><th>渠道</th><th>订单</th><th>状态</th><th>核算明细 / 被拒原因</th><th>资格取得方</th><th>规则版本</th><th>失效</th><th>落库 UTC</th></tr></thead>
+      <tbody>
+      {% for r in section.ledger %}
+        <tr class="{% if r.stale %}row-stale{% endif %}"><td class="num">{{ loop.index }}</td><td tabindex="0">{{ r.event_id }}</td><td tabindex="0"><span class="tag tag--{{ r.channel }}">{{ r.channel_label }}</span></td><td tabindex="0">{{ r.order_id }}</td><td tabindex="0"><span class="cell-status {% if r.status=='ACCEPTED' %}ok{% else %}warn{% endif %}">{{ {'ACCEPTED':'已确认','REJECTED':'已拒绝','PENDING':'待核算'}.get(r.status,r.status) }}</span></td><td tabindex="0">{{ r.detail }}</td><td tabindex="0">{{ r.owner or '—' }}</td><td tabindex="0" class="num">{{ r.rule_version }}</td><td tabindex="0">{% if r.stale %}<b class="bad">失效待重算</b>{% else %}有效{% endif %}</td><td tabindex="0">{{ r.created }}</td></tr>
+      {% else %}<tr><td colspan="10" class="empty">台账为空：先在采信页导入含渠道的样例，或用上方表单提交。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="panel full">
+  <div class="panel__head"><h2>当前唯一退款结果（按实际退货时间）</h2><span class="panel__meta">合计 {{ section.refund_total }} 元 · 已确认 {{ section.accepted_count }} 笔</span></div>
+  <div class="panel__body panel__body--scroll">
+    <table class="ledger">
+      <thead><tr><th>退货单</th><th>渠道</th><th>订单</th><th>占用商品</th><th>本次退款 / 元</th><th>含运费 / 元</th><th>退前累计可退</th><th>退后累计可退</th></tr></thead>
+      <tbody>
+      {% for r in section.events %}<tr><td tabindex="0">{{ r.event_id }}</td><td tabindex="0">{{ r.channel_label }}</td><td tabindex="0">{{ r.order_id }}</td><td tabindex="0">{{ r.units_text }}</td><td tabindex="0" class="num">{{ r.this_refund }}</td><td tabindex="0" class="num">{{ r.shipping }}</td><td tabindex="0" class="num">{{ r.cumulative_before }}</td><td tabindex="0" class="num">{{ r.cumulative_after }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+</div>
+<script>
+const channelError=document.getElementById('channel-error');
+const channelResult=document.getElementById('channel-result');
+function channelPayload(){const f=new FormData(document.getElementById('channel-form'));const channel=f.get('channel');const event={};for(const [k,v] of f.entries()){if(k!=='channel')event[k]=v;}event.quantity=Number(event.quantity);return {channel,event};}
+async function channelPost(path,body){channelError.hidden=true;channelResult.textContent='处理中…';try{const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await res.json();if(!res.ok)throw new Error(data.detail||'提交失败');const t=data.target;channelResult.textContent=t?`事件 ${t.event_id}：${t.status==='ACCEPTED'?'已确认退款 '+t.detail:'已拒绝 · '+t.detail}`:'重算完成，退款合计 '+data.refund_total+' 元';setTimeout(()=>location.reload(),600);}catch(e){channelResult.textContent='';channelError.hidden=false;channelError.textContent=e.message;}}
+document.getElementById('channel-form').addEventListener('submit',e=>{e.preventDefault();channelPost('/api/channels/submit',channelPayload());});
+document.getElementById('channel-recover').addEventListener('click',()=>channelPost('/api/channels/recover',{}));
+</script>{% endblock %}

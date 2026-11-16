@@ -18,4 +18,7 @@ def test_negative_remaining_detected(orders):
     calculation=execute(orders);calculation['accounts'][0]['remaining']='-1.00';assert not verify(orders,calculation)['balanced']
 
 def test_refund_order_permutation_stable(orders):
-    reverse=deepcopy(orders);reverse['returns'].reverse();assert execute(orders)['rows']==execute(reverse)['rows']
+    reverse=deepcopy(orders);reverse['returns'].reverse()
+    def core(out):
+        return [{k:v for k,v in r.items() if k not in ('arrival_seq','business_seq','sync_note')} for r in out['rows']]
+    assert core(execute(orders))==core(execute(reverse))

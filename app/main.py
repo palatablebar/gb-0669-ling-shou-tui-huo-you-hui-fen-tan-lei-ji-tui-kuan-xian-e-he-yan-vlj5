@@ -8,7 +8,9 @@ from app import store
 from app.web import render
 app=FastAPI(title=TITLE)
 app.mount('/static',StaticFiles(directory=ROOT/'app/static'),name='static')
-for i,(slug,_) in enumerate(PAGES,1):app.include_router(import_module(f'app.modules.m{i}_{slug}.handler').router)
+MODULE_BY_SLUG = {'intake': 'm1_intake', 'contract': 'm2_contract', 'model': 'm3_model', 'calculate': 'm4_calculate', 'channels': 'm8_channels', 'quarantine': 'm5_quarantine', 'reconcile': 'm6_reconcile', 'batches': 'm7_batches'}
+for slug, _ in PAGES:
+    app.include_router(import_module(f'app.modules.{MODULE_BY_SLUG[slug]}.handler').router)
 
 @app.exception_handler(DomainError)
 async def domain_error(request,exc):return JSONResponse({'code':exc.code,'detail':exc.detail},status_code=exc.status)

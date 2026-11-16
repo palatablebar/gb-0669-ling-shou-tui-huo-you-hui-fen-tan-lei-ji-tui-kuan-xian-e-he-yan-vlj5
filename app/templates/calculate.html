@@ -1,1 +1,33 @@
-{% extends "base.html" %}{% from "base.html" import cells with context %}{% block content %}<div class="grid"><section class="panel full"><div class="panel__head"><h2>退款结果</h2><span class="panel__meta">合计 {{ section.refund_total }} CNY</span></div>{{ cells(section.rows,[('event_id','退货单'),('order_id','订单'),('sku','商品'),('quantity','件数'),('refund','退款 / 元'),('shipping','含运费 / 元'),('line','原行')]) }}</section><section class="panel"><div class="panel__head"><h2>订单剩余额</h2></div>{{ cells(section.accounts,[('order_id','订单'),('refunded','已退 / 元'),('remaining','可退 / 元')]) }}</section><section class="panel"><div class="panel__head"><h2>退款拒绝</h2><span class="cell-status warn">{{ section.quarantine|length }} 条</span></div>{{ cells(section.quarantine,[('line','原行'),('code','原因码'),('detail','说明')]) }}</section></div>{% endblock %}
+{% extends "base.html" %}{% from "base.html" import cells with context %}{% block content %}<div class="grid">
+<section class="panel full">
+  <div class="panel__head"><h2>各次退货占用与资格归属</h2><span class="panel__meta">按实际退货时间(UTC+事件号)排序 · 合计 {{ section.refund_total }} CNY</span></div>
+  <div class="panel__body panel__body--scroll">
+    <table class="ledger">
+      <thead><tr class="letters"><th></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th></tr>
+      <tr><th>#</th><th>退货单</th><th>渠道</th><th>订单</th><th>占用商品（件序）</th><th>累计可退(退前) / 元</th><th>本次可退 / 元</th><th>含运费 / 元</th><th>累计可退(退后) / 元</th><th>运费资格</th><th>同步顺序</th></tr></thead>
+      <tbody>
+      {% for r in section.events %}
+        <tr><td class="num">{{ loop.index }}</td><td tabindex="0">{{ r.event_id }}</td><td tabindex="0"><span class="tag tag--{{ r.channel }}">{{ r.channel_label }}</span></td><td tabindex="0">{{ r.order_id }}</td><td tabindex="0">{{ r.units_text }}</td><td tabindex="0" class="num">{{ r.cumulative_before }}</td><td tabindex="0" class="num"><b>{{ r.this_refund }}</b></td><td tabindex="0" class="num">{{ r.shipping }}</td><td tabindex="0" class="num">{{ r.cumulative_after }}</td><td tabindex="0">{{ r.shipping_owner or '—' }}</td><td tabindex="0" class="cell-status">{{ r.sync_note }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="panel full">
+  <div class="panel__head"><h2>订单维度：各SKU占用与累计可退</h2><span class="panel__meta">{{ section.accounts|length }} 单</span></div>
+  <div class="panel__body panel__body--scroll">
+    <table class="ledger">
+      <thead><tr><th>订单</th><th>SKU</th><th>售出</th><th>已退</th><th>剩余可退件</th><th>占用渠道</th><th>订单实付 / 元</th><th>累计已退 / 元</th><th>累计可退 / 元</th><th>运费已退</th></tr></thead>
+      <tbody>
+      {% for a in section.accounts %}{% for s in a.skus %}
+        <tr><td tabindex="0">{{ a.order_id }}</td><td tabindex="0">{{ s.sku }}</td><td tabindex="0" class="num">{{ s.sold }}</td><td tabindex="0" class="num">{{ s.returned }}</td><td tabindex="0" class="num"><b>{{ s.remaining }}</b></td><td tabindex="0">{{ s.channels }}</td>{% if loop.first %}<td tabindex="0" class="num" rowspan="{{ a.skus|length }}">{{ a.paid }}</td><td tabindex="0" class="num" rowspan="{{ a.skus|length }}">{{ a.refunded }}</td><td tabindex="0" class="num" rowspan="{{ a.skus|length }}">{{ a.remaining }}</td><td tabindex="0" rowspan="{{ a.skus|length }}">{{ '是' if a.shipping_refunded else '否' }}</td>{% endif %}</tr>
+      {% endfor %}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="panel full">
+  <div class="panel__head"><h2>退款拒绝与被拒渠道可见原因</h2><span class="cell-status warn">{{ section.quarantine|length }} 条</span></div>
+  {{ cells(section.quarantine,[('line','原行'),('channel_label','被拒渠道'),('code','原因码'),('detail','被拒原因'),('owner_label','资格取得方')]) }}
+</section>
+</div>{% endblock %}
