@@ -1,0 +1,17 @@
+name: p1109-0669
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-18208}:8000"
+    environment:
+      DB_PATH: /data/state.sqlite
+    volumes:
+      - records:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+volumes:
+  records:

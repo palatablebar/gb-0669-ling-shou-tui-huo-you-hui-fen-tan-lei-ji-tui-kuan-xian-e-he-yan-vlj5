@@ -1,0 +1,24 @@
+:root {
+ --bg: #eeede4;
+ --rail: #34372d;
+ --panel: #fffef3;
+ --panel-2: #e5e4ce;
+ --ink: #282b21;
+ --ink-2: #747664;
+ --line: #d1d2bd;
+ --line-2: #94977d;
+ --accent: #91820a;
+ --accent-ink: #ffffff;
+ --ok: #37734b;
+ --warn: #a06f13;
+ --bad: #b14332;
+ --info: #697474;
+ --ui: Arial,"PingFang SC",sans-serif;
+ --mono: "SFMono-Regular",Menlo,monospace;
+ --radius: 0px;
+ --gap: 8px;
+ --pad: 9px;
+ --row: 25px;
+ --bar: 44px;
+ --rail-width: 184px;
+}
